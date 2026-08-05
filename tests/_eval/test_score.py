@@ -7,7 +7,7 @@ import pydantic
 import pytest
 from test_helpers.utils import skip_if_no_openai
 
-from inspect_ai import score
+from inspect_ai import Task, eval, score
 from inspect_ai._eval.score import (
     ScoreAction,
     _get_updated_events,
@@ -36,6 +36,7 @@ from inspect_ai.scorer import accuracy
 from inspect_ai.scorer._metric import SampleScore, Score
 from inspect_ai.scorer._scorer import Scorer, scorer
 from inspect_ai.scorer._target import Target
+from inspect_ai.solver import generate
 from inspect_ai.solver._task_state import TaskState
 from inspect_ai.util._span import span
 
@@ -466,6 +467,58 @@ def test_score_append_with_unavailable_metrics():
     assert "match" in scores
     # New "f1" scores should be appended
     assert "f1" in scores
+
+
+@scorer(metrics=[accuracy()], name="scorer_a")
+def scorer_a() -> Scorer:
+    async def score(state: TaskState, target: Target) -> Score:
+        return Score(value=1.0)
+
+    return score
+
+
+@scorer(metrics=[accuracy()], name="scorer_b")
+def scorer_b() -> Scorer:
+    async def score(state: TaskState, target: Target) -> Score:
+        return Score(value=1.0)
+
+    return score
+
+
+def _scored_log_with_epochs() -> Any:
+    # epochs > 1 so the eval produces reductions to begin with
+    task = Task(
+        dataset=[Sample(input="Say hi", target="hi")],
+        solver=generate(),
+        scorer=scorer_a(),
+        epochs=2,
+    )
+    (log,) = eval(task, model="mockllm/model", display="none")
+    return log
+
+
+@pytest.mark.parametrize(
+    ("action", "expected"),
+    [
+        pytest.param("append", ["scorer_a", "scorer_b"], id="append-merges"),
+        pytest.param("overwrite", ["scorer_b"], id="overwrite-replaces"),
+    ],
+)
+def test_score_reductions_follow_action(action: ScoreAction, expected: list[str]):
+    """Regression test for https://github.com/UKGovernmentBEIS/inspect_ai/issues/4764.
+
+    Reductions are computed only for the scorers run in this pass, so assigning
+    them wholesale dropped every pre-existing scorer's reductions under append,
+    even though results.scores retained all of them.
+    """
+    log = _scored_log_with_epochs()
+    assert [reduction.scorer for reduction in (log.reductions or [])] == ["scorer_a"]
+
+    scored_log = score(log=log, scorers=scorer_b(), action=action, display="none")
+
+    assert scored_log.results is not None
+    assert [score.name for score in scored_log.results.scores] == expected
+    assert [reduction.scorer for reduction in (scored_log.reductions or [])] == expected
 
 
 @pytest.mark.anyio

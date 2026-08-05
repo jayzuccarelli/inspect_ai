@@ -379,14 +379,15 @@ async def score_async(
         # Since the metrics calculation above is only be done using the scorers
         # and scores that were generated during this scoring run, we need to process
         # the results carefully, depending upon whether the action was "append" or "overwrite"
-        log.reductions = reductions
         if action == "overwrite" or log.results is None:
             # Completely replace the results with the new results
+            log.reductions = reductions
             log.results = results
             log.eval.scorers = applied_eval_scorers
         else:
             # Only update the results with the new scores, leaving the rest
             # of the results as they were
+            log.reductions = (log.reductions or []) + (reductions or [])
             log.results.scores.extend(results.scores)
             log.eval.scorers = (log.eval.scorers or []) + applied_eval_scorers
 
