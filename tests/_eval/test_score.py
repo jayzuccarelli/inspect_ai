@@ -22,6 +22,7 @@ from inspect_ai.event._model import ModelEvent
 from inspect_ai.event._sample_init import SampleInitEvent
 from inspect_ai.event._score import ScoreEvent
 from inspect_ai.log import (
+    EvalLog,
     EvalSample,
     Transcript,
 )
@@ -485,7 +486,7 @@ def scorer_b() -> Scorer:
     return score
 
 
-def _scored_log_with_epochs() -> Any:
+def _scored_log_with_epochs() -> EvalLog:
     # epochs > 1 so the eval produces reductions to begin with
     task = Task(
         dataset=[Sample(input="Say hi", target="hi")],
