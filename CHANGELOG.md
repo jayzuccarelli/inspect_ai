@@ -1,5 +1,6 @@
 ## Unreleased
 
+- Eval Log: Approval policies specified on a `Task` are now recorded in the eval log's config, so hooks, `eval_df()`, and `eval retry` see the approval policy the eval actually ran with.
 - Anthropic: models returning omitted (empty) thinking summaries no longer misreport `usage.reasoning_tokens` and log a token-counting warning on every generate.
 - Grok: Support for Grok 4.6, including its new `xhigh` reasoning effort and a `service_tier` model argument for Priority Processing.
 - Security: Computer Tool bundled examples now bind dynamically assigned VNC and noVNC ports to loopback instead of all host interfaces.

@@ -22,9 +22,12 @@ from inspect_ai import (
 )
 from inspect_ai._eval.task.log import TaskLogger
 from inspect_ai._util._async import tg_collect
+from inspect_ai.approval import Approval, ApprovalPolicy
 from inspect_ai.approval._policy import ApprovalPolicyConfig, ApproverPolicyConfig
 from inspect_ai.dataset import Sample
+from inspect_ai.model import ChatMessage
 from inspect_ai.scorer import match
+from inspect_ai.tool import ToolCall, ToolCallView
 
 
 def test_eval_epochs_sample_count():
@@ -309,6 +312,34 @@ def test_eval_approval_override():
         approval=eval_approval,
     )[0]
     assert log.eval.config.approval == eval_approval
+
+
+def test_eval_task_approval_recorded():
+    task = Task(dataset=[Sample(input="Say Hello", target="Hello")], approval="auto")
+    log = eval(task, model="mockllm/model")[0]
+    assert log.eval.config.approval == ApprovalPolicyConfig(
+        approvers=[ApproverPolicyConfig(name="auto", tools="*")]
+    )
+
+
+def test_eval_task_approval_unregistered_approver():
+    # a bare function approver can't be recorded (no registry name/params)
+    # but should still run
+    async def approve(
+        message: str,
+        call: ToolCall,
+        view: ToolCallView,
+        history: list[ChatMessage],
+    ) -> Approval:
+        return Approval(decision="approve")
+
+    task = Task(
+        dataset=[Sample(input="Say Hello", target="Hello")],
+        approval=[ApprovalPolicy(approver=approve, tools="*")],
+    )
+    log = eval(task, model="mockllm/model")[0]
+    assert log.status == "success"
+    assert log.eval.config.approval is None
 
 
 def test_eval_sandbox_init_when_first_task_has_no_sandbox():

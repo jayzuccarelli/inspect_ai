@@ -39,6 +39,8 @@ from inspect_ai._display.core.display import CancelType, TaskCancel, TaskSpec
 from inspect_ai._eval.task.scan import Scanners
 from inspect_ai._util.error import PrerequisiteError, exception_message
 from inspect_ai._util.path import chdir
+from inspect_ai._util.registry import is_registry_object
+from inspect_ai.approval._policy import config_from_approval_policies
 from inspect_ai.dataset._dataset import Dataset, Sample
 from inspect_ai.log import EvalConfig, EvalLog
 from inspect_ai.log._file import EvalLogInfo
@@ -325,6 +327,18 @@ async def eval_run(
                     task_eval_config.score_on_error = task.score_on_error
                 else:
                     task.score_on_error = task_eval_config.score_on_error
+
+                # approval (task-level approval applies only when eval-level
+                # approval was not specified; bare function approvers have no
+                # registry name/params to record, so leave those unrecorded)
+                if (
+                    task_eval_config.approval is None
+                    and task.approval
+                    and all(is_registry_object(p.approver) for p in task.approval)
+                ):
+                    task_eval_config.approval = config_from_approval_policies(
+                        task.approval
+                    )
 
                 # merge eval-level and task-level tags
                 merged_tags = list(set(tags or []) | set(task.tags or [])) or None
